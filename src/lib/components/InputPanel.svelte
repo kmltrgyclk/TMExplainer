@@ -1,10 +1,9 @@
 <script lang="ts">
 	import { lab } from '$lib/lab.svelte';
-	import { SHORT_CLASS_TEX } from '$lib/labels';
 	import { tex } from '$lib/tex';
 
 	const indices = $derived(Array.from({ length: lab.config.features }, (_, k) => k));
-	const noisy = $derived(lab.source === 'train' && lab.label !== null && lab.label !== lab.trueLabel);
+	const noisy = $derived(lab.source === 'train' && lab.label !== null && lab.label !== lab.truth);
 
 	const sourceText = $derived(
 		lab.source === 'train'
@@ -41,7 +40,7 @@
 	<div class="truth">
 		<div class="row">
 			<span class="eyebrow">Label</span>
-			<span class="strong">{@html tex(`x_1 \\oplus x_2 = ${lab.trueLabel}`)} · {@html tex(SHORT_CLASS_TEX[lab.trueLabel])}</span>
+			<span class="strong">{@html tex(`x_1 \\oplus x_2 = ${lab.truth ?? 0}`)} · {@html tex(lab.dataset.classTex[lab.truth ?? 0])}</span>
 		</div>
 		{#if lab.source === 'train' && lab.label !== null}
 			<div class="row">

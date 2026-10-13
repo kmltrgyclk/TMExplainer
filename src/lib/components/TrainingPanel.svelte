@@ -1,10 +1,9 @@
 <script lang="ts">
 	import { lab } from '$lib/lab.svelte';
 	import { rich } from '$lib/tex';
-	import { MAX_EPOCHS } from '$lib/tm/defaults';
 	import StepStory from './StepStory.svelte';
 
-	const clauseOptions = [2, 4, 6, 8, 10, 12, 16, 20];
+	const clauseOptions = $derived(lab.dataset.clauseOptions);
 
 	function setClauses(event: Event) {
 		const clauses = Number((event.target as HTMLSelectElement).value);
@@ -37,8 +36,8 @@
 	<div class="controls">
 		<button class="btn primary" onclick={() => lab.step()}>Step one example</button>
 		<button class="btn" onclick={() => lab.runEpoch()}>Run one epoch</button>
-		<button class="btn" onclick={() => lab.play()} disabled={!lab.playing && lab.epoch >= MAX_EPOCHS}>
-			{lab.playing ? 'Pause' : `Train to epoch ${MAX_EPOCHS}`}
+		<button class="btn" onclick={() => lab.play()} disabled={!lab.playing && lab.epoch >= lab.maxEpochs}>
+			{lab.playing ? 'Pause' : `Train to epoch ${lab.maxEpochs}`}
 		</button>
 		<button class="btn" onclick={() => lab.reset()}>Reset to untrained</button>
 		<button class="btn" onclick={() => lab.loadTrained()}>Load trained model</button>

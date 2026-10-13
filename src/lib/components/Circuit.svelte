@@ -3,7 +3,6 @@
 	import { gsap } from 'gsap';
 	import { lab } from '$lib/lab.svelte';
 	import { INCLUDE_FROM, STATE_MAX, isPositive } from '$lib/tm/machine';
-	import { SHORT_CLASS_TEX } from '$lib/labels';
 	import { BEAT } from '$lib/story';
 	import { literalTex, rich, tex } from '$lib/tex';
 	import ViewSwitch from './ViewSwitch.svelte';
@@ -29,6 +28,7 @@
 
 	let root: HTMLElement;
 	let hover = $state<Gate | null>(null);
+	let firingOnly = $state(false);
 
 	const F = $derived(lab.config.features);
 	const L = $derived(2 * F);
@@ -89,6 +89,10 @@
 		}
 		return list;
 	});
+
+	const shownWires = $derived(
+		firingOnly ? wires.filter((w) => outputs[w.c]?.[w.j] === 1 || (hover?.c === w.c && hover?.j === w.j)) : wires
+	);
 
 	const dying = $derived.by(() => {
 		lab.version;
@@ -211,7 +215,13 @@
 			<p class="eyebrow">Clauses as a circuit</p>
 			<h2>Each clause is an AND gate wired to the literals it includes</h2>
 		</div>
-		<ViewSwitch />
+		<div class="tools">
+			<div class="filter" role="group" aria-label="Which wires to show">
+				<button class:on={!firingOnly} onclick={() => (firingOnly = false)}>All wires</button>
+				<button class:on={firingOnly} onclick={() => (firingOnly = true)}>Firing clauses</button>
+			</div>
+			<ViewSwitch />
+		</div>
 	</header>
 
 	<div class="info" aria-live="polite">
@@ -260,7 +270,7 @@
 				{#each ghosts as g (g.key)}
 					<path class="wire ghost" d={g.d} />
 				{/each}
-				{#each wires as w (w.key)}
+				{#each shownWires as w (w.key)}
 					{@const width = 1 + 2.4 * w.conf}
 					<path
 						class="wire"
@@ -276,7 +286,7 @@
 						pathLength="1"
 					/>
 				{/each}
-				{#each wires.filter((w) => w.active) as w (w.key)}
+				{#each shownWires.filter((w) => w.active) as w (w.key)}
 					<path class="pulse s1" d={w.d} pathLength="1" />
 				{/each}
 			</g>
@@ -359,7 +369,7 @@
 			{#each Array.from({ length: C }, (_, c) => c) as c}
 				{@const f = feedbackFor(c)}
 				<span class="lbl left above classname" style:left={px(GATE_X)} style:top={py(classTop(c) - 6)}>
-					{@html rich(`Class ${c} · $${SHORT_CLASS_TEX[c]}$`)}
+					{@html rich(`Class ${c} · $${lab.dataset.classTex[c]}$`)}
 					{#if f && shown(BEAT.probability)}<span class="role" class:target={f.role === 'target'}>{f.role === 'target' ? 'target' : 'negative'} · {@html tex(`p = ${f.probability.toFixed(2)}`)}</span>{/if}
 				</span>
 				{#each Array.from({ length: n }, (_, j) => j) as j}
@@ -376,7 +386,7 @@
 				{/each}
 				<span class="lbl centre above small" style:left={px(SUM_X)} style:top={py(sumY(c) - SUM_R - 3)}>{@html tex(`v_{${c}}`)}</span>
 			{/each}
-			<span class="lbl centre predname" style:left={px(PRED_X + PRED_W / 2)} style:top={py(predY + 13)}>{@html tex(SHORT_CLASS_TEX[lab.inference.prediction])}</span>
+			<span class="lbl centre predname" style:left={px(PRED_X + PRED_W / 2)} style:top={py(predY + 13)}>{@html tex(lab.dataset.classTex[lab.inference.prediction])}</span>
 		</div>
 		</div>
 	</div>
@@ -400,6 +410,31 @@
 		flex-direction: column;
 		gap: 10px;
 		min-width: 0;
+	}
+	.tools {
+		display: flex;
+		gap: 8px;
+		flex-wrap: wrap;
+	}
+	.filter {
+		display: inline-flex;
+		border: 1px solid var(--line);
+		border-radius: 8px;
+		overflow: hidden;
+		background: var(--surface);
+	}
+	.filter button {
+		border: 0;
+		background: none;
+		padding: 5px 12px;
+		cursor: pointer;
+		font-size: 13px;
+		font-weight: 600;
+		color: var(--muted);
+	}
+	.filter button.on {
+		background: var(--ink);
+		color: var(--surface);
 	}
 	.head {
 		display: flex;

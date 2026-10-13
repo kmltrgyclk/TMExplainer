@@ -9,7 +9,6 @@
 		literalName,
 		isPositive
 	} from '$lib/tm/machine';
-	import { CLASS_NAMES } from '$lib/labels';
 	import { gsap } from 'gsap';
 	import ViewSwitch from './ViewSwitch.svelte';
 	import { literalTex, rich, tex } from '$lib/tex';
@@ -92,7 +91,7 @@
 			{#each classIndices as c}
 				<div class="classrow">
 					<span class="eyebrow">Class {c}</span>
-					<span class="classname">{@html rich(CLASS_NAMES[c])}</span>
+					<span class="classname">{@html rich(lab.dataset.classNames[c])}</span>
 					{#if feedbackFor(c) && shown(BEAT.probability)}
 						{@const f = feedbackFor(c)!}
 						<span class="role mono" class:target={f.role === 'target'}>

@@ -8,25 +8,24 @@ import {
 	type Machine,
 	type StepTrace
 } from './tm/machine';
-import { noisyXor, xorLabel } from './tm/noisyxor';
 import { createRng, shuffle } from './tm/rng';
-import { DATA_SEED, DEFAULT_CONFIG, MAX_EPOCHS } from './tm/defaults';
-import pretrained from './tm/pretrained.json';
+import { DATASETS, type DatasetId } from './data/datasets';
 import { BEAT, BEATS, BEAT_MS } from './story';
 
 export type Point = { epoch: number; accuracy: number };
 export type Source = 'manual' | 'train' | 'test';
 
-const STEPS_PER_FRAME = 1250;
+const FRAME_BUDGET_MS = 12;
 
 class Lab {
-	data = noisyXor(DATA_SEED);
-	machine: Machine = createMachine(DEFAULT_CONFIG);
+	datasetId = $state<DatasetId>('xor');
+	dataset = $derived(DATASETS[this.datasetId]);
+	machine: Machine = createMachine(DATASETS.xor.config);
 	order: number[] = [];
 	cursor = 0;
 
 	version = $state(0);
-	config = $state<Config>({ ...DEFAULT_CONFIG });
+	config = $state<Config>({ ...DATASETS.xor.config });
 	epoch = $state(0);
 	steps = $state(0);
 	history = $state<Point[]>([]);
@@ -73,7 +72,15 @@ class Lab {
 
 	region = $derived(this.trace ? BEATS[this.beat].region : this.guideRegion);
 
-	trueLabel = $derived(xorLabel(this.input));
+	truth = $derived(this.dataset.truth ? this.dataset.truth(this.input) : this.label);
+
+	get data() {
+		return this.dataset;
+	}
+
+	get maxEpochs() {
+		return this.dataset.maxEpochs;
+	}
 
 	constructor() {
 		this.loadTrained();
@@ -87,8 +94,17 @@ class Lab {
 		this.machine.rng = createRng(this.machine.config.seed * 7919 + epochs);
 	}
 
+	setDataset(id: DatasetId) {
+		if (id === this.datasetId) return;
+		this.datasetId = id;
+		this.view = 'circuit';
+		this.guidePage = 0;
+		this.loadTrained();
+	}
+
 	loadTrained() {
 		this.stop();
+		const pretrained = this.dataset.pretrained;
 		this.machine = importMachine(pretrained);
 		this.config = { ...pretrained.config };
 		this.history = pretrained.history.map((p) => ({ ...p }));
@@ -97,8 +113,8 @@ class Lab {
 		this.reseed(this.epoch);
 		this.startEpoch();
 		this.clearTrace();
-		this.selected = { cls: 1, clause: 0 };
-		this.showTest(this.firstTestIndex(1));
+		this.showTest(this.dataset.initialTest);
+		this.selected = { cls: this.dataset.test.Y[this.dataset.initialTest], clause: 0 };
 		this.touch();
 	}
 
@@ -119,10 +135,6 @@ class Lab {
 		this.config[key] = value;
 		this.machine.config[key] = value;
 		this.touch();
-	}
-
-	firstTestIndex(y: number) {
-		return this.data.test.Y.findIndex((label, i) => label === y && this.data.test.X[i][2] === 0);
 	}
 
 	startEpoch() {
@@ -218,14 +230,17 @@ class Lab {
 
 	play() {
 		if (this.playing) return this.stop();
-		if (this.epoch >= MAX_EPOCHS) return;
+		if (this.epoch >= this.maxEpochs) return;
 		this.playing = true;
 		this.clearTrace();
 		const frame = () => {
 			if (!this.playing) return;
-			for (let n = 0; n < STEPS_PER_FRAME && this.epoch < MAX_EPOCHS; n++) this.advance(false);
+			const start = performance.now();
+			while (performance.now() - start < FRAME_BUDGET_MS && this.epoch < this.maxEpochs) {
+				for (let n = 0; n < 64 && this.epoch < this.maxEpochs; n++) this.advance(false);
+			}
 			this.touch();
-			if (this.epoch >= MAX_EPOCHS) this.playing = false;
+			if (this.epoch >= this.maxEpochs) this.playing = false;
 			else requestAnimationFrame(frame);
 		};
 		requestAnimationFrame(frame);
@@ -247,9 +262,21 @@ class Lab {
 	}
 
 	toggle(k: number) {
+		this.paint(k, this.input[k] ? 0 : 1);
+	}
+
+	paint(k: number, value: number) {
+		if (this.source === 'manual' && this.input[k] === value) return;
 		const next = [...this.input];
-		next[k] = next[k] ? 0 : 1;
+		next[k] = value;
 		this.input = next;
+		this.label = null;
+		this.source = 'manual';
+		this.clearTrace();
+	}
+
+	clearInput() {
+		this.input = new Array(this.dataset.features).fill(0);
 		this.label = null;
 		this.source = 'manual';
 		this.clearTrace();

@@ -3,22 +3,23 @@
 	import { GUIDE } from '$lib/guide';
 	import { rich, tex } from '$lib/tex';
 
-	const page = $derived(GUIDE[lab.guidePage]);
+	const pages = $derived(GUIDE.filter((p) => !p.only || p.only === lab.datasetId));
+	const page = $derived(pages[Math.min(lab.guidePage, pages.length - 1)]);
 	const formula = $derived(page.formula ? tex(page.formula, true) : '');
 
 	function go(i: number) {
-		lab.guidePage = Math.max(0, Math.min(GUIDE.length - 1, i));
-		lab.region = GUIDE[lab.guidePage].region;
+		lab.guidePage = Math.max(0, Math.min(pages.length - 1, i));
+		lab.guideRegion = pages[lab.guidePage].region;
 	}
 
 	$effect(() => {
-		lab.region = lab.guideOpen ? GUIDE[lab.guidePage].region : null;
+		lab.guideRegion = lab.guideOpen ? page.region : null;
 	});
 </script>
 
 <aside class="guide panel" aria-label="Guide">
 	<div class="top">
-		<p class="eyebrow">Guide · {lab.guidePage + 1} of {GUIDE.length}</p>
+		<p class="eyebrow">Guide · {lab.guidePage + 1} of {pages.length}</p>
 		<button class="close" onclick={() => (lab.guideOpen = false)} aria-label="Close guide">×</button>
 	</div>
 	<h2>{page.title}</h2>
@@ -31,11 +32,11 @@
 	<nav>
 		<button class="btn" onclick={() => go(lab.guidePage - 1)} disabled={lab.guidePage === 0}>Back</button>
 		<div class="dots">
-			{#each GUIDE as g, i}
+			{#each pages as g, i}
 				<button class="dot" class:on={i === lab.guidePage} onclick={() => go(i)} aria-label="Go to {g.title}"></button>
 			{/each}
 		</div>
-		<button class="btn primary" onclick={() => go(lab.guidePage + 1)} disabled={lab.guidePage === GUIDE.length - 1}>Next</button>
+		<button class="btn primary" onclick={() => go(lab.guidePage + 1)} disabled={lab.guidePage === pages.length - 1}>Next</button>
 	</nav>
 </aside>
 

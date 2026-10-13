@@ -61,9 +61,46 @@
 		return tex(`${name} = ${body}`);
 	});
 
-	const visible = $derived(
-		detail ? detail.tracks.filter((t) => showAll || t.kind || t.state >= INCLUDE_FROM - NEAR) : []
-	);
+	const stencil = $derived.by(() => {
+		const grid = lab.dataset.grid;
+		if (!grid || !detail) return null;
+		const states = lab.states[detail.cls];
+		const base = detail.clause * literalCount;
+		const cells = [];
+		for (let p = 0; p < features; p++) {
+			const ink = states[base + p] >= INCLUDE_FROM;
+			const blank = states[base + features + p] >= INCLUDE_FROM;
+			if (!ink && !blank) continue;
+			const blocking = (ink && !lab.inference.literals[p]) || (blank && !lab.inference.literals[features + p]);
+			cells.push({ p, row: Math.floor(p / grid.cols), col: p % grid.cols, ink, blank, blocking });
+		}
+		return { rows: grid.rows, cols: grid.cols, cells };
+	});
+
+	const image = $derived(!!lab.dataset.grid);
+
+	const visible = $derived.by(() => {
+		if (!detail) return [];
+		if (image) return detail.tracks.filter((t) => t.kind && (showAll || crosses(t)));
+		if (showAll) return detail.tracks;
+		return detail.tracks.filter((t) => t.kind || t.state >= INCLUDE_FROM - NEAR);
+	});
+
+	function crosses(t: Track) {
+		return t.before < INCLUDE_FROM !== t.after < INCLUDE_FROM;
+	}
+
+	const byLiteral = $derived(detail ? new Map(detail.tracks.map((t) => [t.k, t])) : new Map<number, Track>());
+
+	const broken = $derived(stencil ? stencil.cells.filter((c) => c.blocking).length : 0);
+
+	function stateFill(state: number) {
+		if (state >= INCLUDE_FROM) {
+			const depth = (state - INCLUDE_FROM) / (STATE_MAX - INCLUDE_FROM);
+			return `color-mix(in oklab, var(--include) ${Math.round(45 + 55 * depth)}%, var(--surface))`;
+		}
+		return `color-mix(in oklab, var(--muted) ${Math.round(4 + 26 * (state / (INCLUDE_FROM - 1)))}%, var(--surface))`;
+	}
 
 	const moves = $derived(detail ? detail.tracks.filter((t) => t.kind).length : 0);
 
@@ -87,10 +124,35 @@
 				({detail.positive ? 'positive: votes for' : 'negative: votes against'} the class)
 			</span>
 		</h2>
+		{#if stencil}
+			<div class="stencilrow">
+				<svg class="stencil" viewBox="0 0 {stencil.cols} {stencil.rows}" role="img" aria-label="Pixels this clause needs">
+					{#each Array.from({ length: stencil.rows * stencil.cols }, (_, p) => p) as p}
+						{#if lab.inference.literals[p]}
+							<rect class="drawn" x={p % stencil.cols} y={Math.floor(p / stencil.cols)} width="1" height="1" />
+						{/if}
+					{/each}
+					{#each stencil.cells as c (c.p)}
+						{#if c.blank && !c.ink}
+							<rect class="blank" x={c.col + 0.18} y={c.row + 0.18} width="0.64" height="0.64" rx="0.1" />
+						{:else}
+							<rect class="ink" x={c.col + 0.12} y={c.row + 0.12} width="0.76" height="0.76" rx="0.1" />
+						{/if}
+						{#if c.blocking}
+							<circle class="block" cx={c.col + 0.5} cy={c.row + 0.5} r="0.22" />
+						{/if}
+					{/each}
+				</svg>
+				<p class="stencilnote">Solid squares must be inked and outlined squares must be blank. Shaded cells are the current input. Red dots break the clause.</p>
+			</div>
+		{/if}
 		<div class="formula">{@html formula}</div>
 
 		<p class="eval">
-			{#if detail.included.length === 0}
+			{#if image}
+				<span class="term out" class:zero={!detail.output}>{@html tex(`${name} = ${detail.output}`)}</span>
+				<span class="arrow">{detail.included.length} literals included, {broken} broken by this input.</span>
+			{:else if detail.included.length === 0}
 				No literal is included. An empty clause outputs 1 during training and 0 at inference.
 			{:else}
 				{#each detail.included as k}
@@ -104,11 +166,33 @@
 		<div class="trackhead">
 			<p class="eyebrow">Tsetlin automata</p>
 			<div class="filter" role="group" aria-label="Which automata to show">
-				<button class:on={!showAll} onclick={() => (showAll = false)}>Near or above the boundary</button>
-				<button class:on={showAll} onclick={() => (showAll = true)}>All {literalCount}</button>
+				<button class:on={!showAll} onclick={() => (showAll = false)}>{image ? 'Crossed the boundary' : 'Near or above the boundary'}</button>
+				<button class:on={showAll} onclick={() => (showAll = true)}>{image ? 'All moves' : `All ${literalCount}`}</button>
 			</div>
 		</div>
 
+		{#if image && lab.dataset.grid}
+			{@const grid = lab.dataset.grid}
+			<div class="statemaps">
+				{#each [0, 1] as negated}
+					<figure>
+						<figcaption>{@html tex(negated ? '\\lnot x_k' : 'x_k')}: {negated ? 'blank' : 'inked'}</figcaption>
+						<div class="statemap" style:--cols={grid.cols}>
+							{#each Array.from({ length: features }, (_, p) => p) as p}
+								{@const t = byLiteral.get(p + negated * features)}
+								{#if t}
+									<span class="state" style:background={stateFill(t.state)} title="state {t.state}">
+										{#if t.kind}<b class={kindClass[t.kind]}>{glyph[t.kind]}</b>{/if}
+									</span>
+								{/if}
+							{/each}
+						</div>
+					</figure>
+				{/each}
+			</div>
+		{/if}
+
+		{#if visible.length}
 		<div class="scale" aria-hidden="true">
 			<span></span>
 			<span class="ruler mono">
@@ -142,6 +226,7 @@
 				</li>
 			{/each}
 		</ul>
+		{/if}
 		<p class="caption">
 			{#if lab.trace && lab.moved}
 				{moves
@@ -180,9 +265,77 @@
 	.neg {
 		color: var(--neg);
 	}
+	.stencilrow {
+		display: flex;
+		gap: 12px;
+		align-items: center;
+	}
+	.stencil {
+		width: 112px;
+		height: 112px;
+		flex: none;
+		border: 1px solid var(--line);
+		border-radius: 8px;
+		background: var(--surface);
+		padding: 4px;
+	}
+	.stencil .drawn {
+		fill: var(--tint-blue);
+	}
+	.stencil .ink {
+		fill: var(--ink);
+	}
+	.stencil .blank {
+		fill: none;
+		stroke: var(--ink);
+		stroke-width: 0.12;
+	}
+	.stencil .block {
+		fill: var(--neg);
+	}
+	.stencilnote {
+		margin: 0;
+		font-size: 12px;
+		color: var(--muted);
+	}
+	.statemaps {
+		display: flex;
+		gap: 16px;
+		flex-wrap: wrap;
+	}
+	.statemaps figure {
+		margin: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+	}
+	.statemaps figcaption {
+		font-size: 12px;
+		color: var(--muted);
+	}
+	.statemap {
+		display: grid;
+		grid-template-columns: repeat(var(--cols), 14px);
+		gap: 1px;
+	}
+	.state {
+		width: 14px;
+		height: 14px;
+		border-radius: 2px;
+		display: grid;
+		place-items: center;
+		transition: background 0.5s;
+	}
+	.state b {
+		font-size: 9px;
+		line-height: 1;
+		text-shadow: 0 0 2px var(--surface), 0 0 2px var(--surface);
+	}
 	.formula {
 		font-size: 18px;
 		overflow-x: auto;
+		max-height: 140px;
+		overflow-y: auto;
 		padding: 6px 10px;
 		background: var(--raised);
 		border-radius: 7px;

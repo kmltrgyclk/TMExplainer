@@ -3,7 +3,6 @@
 	import { BEAT, BEATS } from '$lib/story';
 	import { TYPE_IA, TYPE_IB, TYPE_II, isPositive, type ClassFeedback } from '$lib/tm/machine';
 	import { rich, signed, tex } from '$lib/tex';
-	import { xorLabel } from '$lib/tm/noisyxor';
 	import FeedbackDial from './FeedbackDial.svelte';
 
 	const trace = $derived(lab.trace);
@@ -55,10 +54,13 @@
 							{#if i === BEAT.example}
 								<p>
 									{@html rich(`The machine sees one training example. Its label is $y = ${trace.y}$.`)}
-									{#if trace.y !== xorLabel(trace.x)}
-										<span class="warn">{@html rich(`This label is noise: $x_1 \\oplus x_2 = ${xorLabel(trace.x)}$.`)}</span>
-									{:else}
-										{@html rich('It matches $x_1 \\oplus x_2$.')}
+									{#if lab.dataset.truth}
+										{@const truth = lab.dataset.truth(trace.x)}
+										{#if trace.y !== truth}
+											<span class="warn">{@html rich(`This label is noise: $x_1 \\oplus x_2 = ${truth}$.`)}</span>
+										{:else}
+											{@html rich('It matches $x_1 \\oplus x_2$.')}
+										{/if}
 									{/if}
 								</p>
 							{:else if i === BEAT.vote}

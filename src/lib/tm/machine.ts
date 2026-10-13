@@ -227,15 +227,25 @@ export function literalName(literal: number, features: number, names?: string[])
 	return literal < features ? name : `¬${name}`;
 }
 
+function toBase64(bytes: Uint8Array): string {
+	let binary = '';
+	for (const byte of bytes) binary += String.fromCharCode(byte);
+	return btoa(binary);
+}
+
+function fromBase64(text: string): Uint8Array {
+	return Uint8Array.from(atob(text), (c) => c.charCodeAt(0));
+}
+
 export function exportMachine(machine: Machine) {
 	return {
 		config: machine.config,
-		states: machine.states.map((s) => Array.from(s))
+		states: machine.states.map(toBase64)
 	};
 }
 
-export function importMachine(data: { config: Config; states: number[][] }): Machine {
+export function importMachine(data: { config: Config; states: (string | number[])[] }): Machine {
 	const machine = createMachine(data.config);
-	data.states.forEach((s, c) => machine.states[c].set(s));
+	data.states.forEach((s, c) => machine.states[c].set(typeof s === 'string' ? fromBase64(s) : s));
 	return machine;
 }

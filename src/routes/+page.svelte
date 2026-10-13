@@ -10,6 +10,10 @@
 	import AccuracyChart from '$lib/components/AccuracyChart.svelte';
 	import Guide from '$lib/components/Guide.svelte';
 	import ThemeSwitch from '$lib/components/ThemeSwitch.svelte';
+	import DatasetSwitch from '$lib/components/DatasetSwitch.svelte';
+	import DrawPad from '$lib/components/DrawPad.svelte';
+	import StencilGallery from '$lib/components/StencilGallery.svelte';
+	import EvidenceMap from '$lib/components/EvidenceMap.svelte';
 </script>
 
 <svelte:head>
@@ -21,9 +25,10 @@
 	<header class="bar">
 		<div class="brand">
 			<h1>TMExplainer</h1>
-			<p>An interactive Tsetlin Machine. Watch propositional clauses learn noisy XOR in your browser. Every number on this page comes from a live machine.</p>
+			<p>An interactive Tsetlin Machine. Watch propositional clauses learn noisy XOR or handwritten digits in your browser. Every number on this page comes from a live machine.</p>
 		</div>
 		<div class="actions">
+			<DatasetSwitch />
 			<ThemeSwitch />
 			{#if !lab.guideOpen}
 				<button class="btn primary" onclick={() => (lab.guideOpen = true)}>Open guide</button>
@@ -33,9 +38,15 @@
 
 	<div class="layout" class:guided={lab.guideOpen}>
 		<main>
-			<InputPanel />
+			{#if lab.dataset.grid}
+				<DrawPad />
+			{:else}
+				<InputPanel />
+			{/if}
 			<div class="flow">
-				{#if lab.view === 'circuit'}
+				{#if lab.dataset.grid}
+					<StencilGallery />
+				{:else if lab.view === 'circuit'}
 					<Circuit />
 				{:else}
 					<ClauseBanks />
@@ -49,7 +60,11 @@
 				<TrainingPanel />
 				<div class="side">
 					<AccuracyChart />
-					<CoverageMap />
+					{#if lab.dataset.grid}
+						<EvidenceMap />
+					{:else}
+						<CoverageMap />
+					{/if}
 				</div>
 			</div>
 		</main>
@@ -62,6 +77,9 @@
 
 	<footer class="foot">
 		A vanilla multi-class Tsetlin Machine (Granmo, 2018) with 8-bit automata, running in your browser.
+		{#if lab.dataset.grid}
+			Digits from <a href="https://doi.org/10.24432/C50P49" target="_blank" rel="noopener">Optical Recognition of Handwritten Digits</a> (Alpaydin and Kaynak, UCI, 1998), CC BY 4.0, converted to black and white.
+		{/if}
 	</footer>
 </div>
 
@@ -132,6 +150,9 @@
 	.foot {
 		color: var(--muted);
 		font-size: 12px;
+	}
+	.foot a {
+		color: inherit;
 	}
 	@media (min-width: 1560px) {
 		.layout.guided {

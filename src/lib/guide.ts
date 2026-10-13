@@ -1,5 +1,8 @@
+import type { DatasetId } from './data/specs';
+
 export type GuidePage = {
 	title: string;
+	only?: DatasetId;
 	region: string | null;
 	body: string[];
 	formula?: string;
@@ -7,7 +10,38 @@ export type GuidePage = {
 
 export const GUIDE: GuidePage[] = [
 	{
+		title: 'The task: handwritten digits',
+		only: 'digits',
+		region: 'input',
+		body: [
+			'Each example is an 8 × 8 image of a handwritten digit from the UCI optical digits collection. Each pixel is one bit: inked or blank.',
+			'Draw your own digit on the pad, or load one from the test set. The prediction updates as you draw.'
+		]
+	},
+	{
+		title: 'Literals',
+		only: 'digits',
+		region: 'input',
+		body: [
+			'Pixel $k$ gives two literals. $x_k$ says the pixel is inked. $\\lnot x_k$ says it is blank.',
+			'The 64 pixels give 128 literals. A clause can ask for ink in one place and blank space in another.'
+		],
+		formula: 'x_k,\\quad \\lnot x_k = 1 - x_k'
+	},
+	{
+		title: 'Clauses as stencils',
+		only: 'digits',
+		region: 'bank',
+		body: [
+			'A clause is an AND of the literals its automata include. Here each clause is drawn as a small image.',
+			'Solid squares must be inked, outlined squares must be blank, and empty squares are ignored. A framed stencil fires on the current input. A red dot marks a pixel that breaks it.',
+			'Click a stencil to see it in the inspector, with its formula and its automata.'
+		],
+		formula: 'C_j = \\bigwedge_{k \\in I_j} l_k'
+	},
+	{
 		title: 'The task: noisy XOR',
+		only: 'xor',
 		region: 'input',
 		body: [
 			'Each example has twelve bits. The label is $x_1 \\oplus x_2$. The other ten bits are noise.',
@@ -17,6 +51,7 @@ export const GUIDE: GuidePage[] = [
 	},
 	{
 		title: 'Literals',
+		only: 'xor',
 		region: 'literals',
 		body: [
 			'Each bit gives two literals: the bit itself and its negation. Twelve bits give 24 literals.',
@@ -26,6 +61,7 @@ export const GUIDE: GuidePage[] = [
 	},
 	{
 		title: 'Tsetlin automata',
+		only: 'xor',
 		region: 'bank',
 		body: [
 			'Every clause has one Tsetlin automaton per literal. Each automaton has 256 states.',
@@ -36,6 +72,7 @@ export const GUIDE: GuidePage[] = [
 	},
 	{
 		title: 'Clauses',
+		only: 'xor',
 		region: 'detail',
 		body: [
 			'A clause $C_j$ is an AND gate over the literals its automata include. It outputs 1 only when every included literal is 1. A gate that outputs 1 is filled.',
@@ -46,6 +83,7 @@ export const GUIDE: GuidePage[] = [
 	},
 	{
 		title: 'What a clause covers',
+		only: 'xor',
 		region: 'coverage',
 		body: [
 			'A clause fires on a region of the input space. The coverage map shows that region for two chosen bits.',
@@ -61,6 +99,15 @@ export const GUIDE: GuidePage[] = [
 			'The class sum $v$ is clipped to the range $-T$ to $+T$. The class with the highest sum is the prediction.'
 		],
 		formula: 'v = \\operatorname{clip}\\Big(\\sum_j C^{+}_j - \\sum_j C^{-}_j,\\ -T,\\ T\\Big)'
+	},
+	{
+		title: 'Evidence map',
+		only: 'digits',
+		region: 'coverage',
+		body: [
+			'The evidence map adds up the firing clauses of one class over the pixels they need. Blue pixels support the class. Red pixels count against it.',
+			'Pick a close rival, such as 8 when the prediction is 3, and compare the two maps.'
+		]
 	},
 	{
 		title: 'How much feedback?',
@@ -94,11 +141,23 @@ export const GUIDE: GuidePage[] = [
 	},
 	{
 		title: 'Try it yourself',
+		only: 'xor',
 		region: 'chart',
 		body: [
 			'Press Reset to untrained, then Train to epoch 200. Watch the rules form in the circuit and the accuracy climb.',
 			'Then change one setting at a time. Set $s$ to 1.5 and the clauses become too general. Set $T$ to 2 and too few clauses learn each pattern.',
 			'Accuracy wobbles even late in training. The 40% label noise keeps pushing the automata.'
+		]
+	}
+,
+	{
+		title: 'Try it yourself',
+		only: 'digits',
+		region: 'chart',
+		body: [
+			'Clear the pad and draw a digit slowly. Watch stencils start and stop firing as you add pixels.',
+			'Press Reset to untrained, then train. With the default settings, test accuracy reaches about 89% within 20 epochs.',
+			'Raise $s$ to make clauses more specific, or lower $T$ to see fewer clauses learn each digit.'
 		]
 	}
 ];
