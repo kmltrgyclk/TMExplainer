@@ -144,7 +144,7 @@ export const GUIDE: GuidePage[] = [
 		only: 'xor',
 		region: 'chart',
 		body: [
-			'Press Reset to untrained, then Train to epoch 200. Watch the rules form in the circuit and the accuracy climb.',
+			'Press Reset to untrained, set the speed to slow and press Train. Watch the rules form in the circuit and the accuracy climb.',
 			'Then change one setting at a time. Set $s$ to 1.5 and the clauses become too general. Set $T$ to 2 and too few clauses learn each pattern.',
 			'Accuracy wobbles even late in training. The 40% label noise keeps pushing the automata.'
 		]
@@ -156,7 +156,7 @@ export const GUIDE: GuidePage[] = [
 		region: 'chart',
 		body: [
 			'Clear the pad and draw a digit slowly. Watch stencils start and stop firing as you add pixels.',
-			'Press Reset to untrained, then train. With the default settings, test accuracy reaches about 89% within 20 epochs.',
+			'Press Reset to untrained and press Train. With the default settings, test accuracy reaches about 89% within 20 epochs. Slow speed lets you watch the stencils form.',
 			'Raise $s$ to make clauses more specific, or lower $T$ to see fewer clauses learn each digit.'
 		]
 	}

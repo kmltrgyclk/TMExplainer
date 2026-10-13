@@ -2,6 +2,9 @@
 	import { lab } from '$lib/lab.svelte';
 	import { rich } from '$lib/tex';
 	import StepStory from './StepStory.svelte';
+	import type { Speed } from '$lib/lab.svelte';
+
+	const speeds: Speed[] = ['slow', 'normal', 'fast'];
 
 	const clauseOptions = $derived(lab.dataset.clauseOptions);
 
@@ -36,11 +39,41 @@
 	<div class="controls">
 		<button class="btn primary" onclick={() => lab.step()}>Step one example</button>
 		<button class="btn" onclick={() => lab.runEpoch()}>Run one epoch</button>
-		<button class="btn" onclick={() => lab.play()} disabled={!lab.playing && lab.epoch >= lab.maxEpochs}>
-			{lab.playing ? 'Pause' : `Train to epoch ${lab.maxEpochs}`}
+		<button class="btn train" class:running={lab.playing} onclick={() => lab.play()} aria-label={lab.playing ? 'Pause training' : 'Train'}>
+			<svg viewBox="0 0 16 16" aria-hidden="true">
+				{#if lab.playing}
+					<rect x="3.5" y="3" width="3" height="10" rx="1" />
+					<rect x="9.5" y="3" width="3" height="10" rx="1" />
+				{:else}
+					<path d="M4.5 3 L13 8 L4.5 13 Z" />
+				{/if}
+			</svg>
+			{lab.playing ? 'Pause' : 'Train'}
 		</button>
 		<button class="btn" onclick={() => lab.reset()}>Reset to untrained</button>
 		<button class="btn" onclick={() => lab.loadTrained()}>Load trained model</button>
+	</div>
+
+	<div class="runbar">
+		<label class="stopat" for="stop-at">
+			<span>Stop at epoch</span>
+			<input
+				id="stop-at"
+				type="number"
+				min="1"
+				step="1"
+				value={lab.stopAt}
+				onchange={(e) => lab.setStopAt(Number(e.currentTarget.value))}
+			/>
+		</label>
+		<div class="speed" role="group" aria-label="Training speed">
+			<span>Speed</span>
+			<div class="segments">
+				{#each speeds as speed}
+					<button class:on={lab.speed === speed} aria-pressed={lab.speed === speed} onclick={() => (lab.speed = speed)}>{speed}</button>
+				{/each}
+			</div>
+		</div>
 	</div>
 
 	<div class="progress" aria-label="Progress through the current epoch">
@@ -114,6 +147,67 @@
 		display: flex;
 		flex-wrap: wrap;
 		gap: 8px;
+	}
+	.train svg {
+		width: 13px;
+		height: 13px;
+		fill: currentColor;
+	}
+	.train.running {
+		border-color: var(--accent);
+		color: var(--accent);
+	}
+	.runbar {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 10px 24px;
+		font-size: 13px;
+		color: var(--muted);
+	}
+	.stopat {
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+	}
+	.stopat span {
+		white-space: nowrap;
+	}
+	.stopat input[type='number'] {
+		width: 72px;
+		border: 1px solid var(--line);
+		border-radius: 6px;
+		background: var(--surface);
+		padding: 4px 8px;
+		font-family: var(--font-data);
+		color: var(--ink);
+	}
+	.speed {
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+	}
+	.segments {
+		display: inline-flex;
+		padding: 2px;
+		gap: 2px;
+		border: 1px solid var(--line);
+		border-radius: 999px;
+		background: var(--surface);
+	}
+	.segments button {
+		border: 0;
+		border-radius: 999px;
+		background: none;
+		padding: 3px 12px;
+		font-size: 12px;
+		font-weight: 600;
+		color: var(--muted);
+		cursor: pointer;
+	}
+	.segments button.on {
+		background: var(--ink);
+		color: var(--surface);
 	}
 	.progress {
 		height: 3px;

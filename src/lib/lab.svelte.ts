@@ -16,6 +16,10 @@ export type Point = { epoch: number; accuracy: number };
 export type Source = 'manual' | 'train' | 'test';
 
 const FRAME_BUDGET_MS = 12;
+const BATCH = 64;
+
+export type Speed = 'slow' | 'normal' | 'fast';
+const EPOCHS_PER_SECOND: Record<Speed, number> = { slow: 0.5, normal: 3, fast: Infinity };
 
 class Lab {
 	datasetId = $state<DatasetId>('xor');
@@ -35,6 +39,8 @@ class Lab {
 	trace = $state.raw<StepTrace | null>(null);
 	selected = $state<{ cls: number; clause: number } | null>(null);
 	playing = $state(false);
+	speed = $state<Speed>('normal');
+	stopAt = $state(DATASETS.xor.maxEpochs);
 	guideOpen = $state(true);
 	guidePage = $state(0);
 	guideRegion = $state<string | null>(null);
@@ -78,6 +84,14 @@ class Lab {
 		return this.dataset;
 	}
 
+	get extension() {
+		return Math.max(10, Math.round(this.dataset.maxEpochs / 4));
+	}
+
+	setStopAt(value: number) {
+		if (Number.isFinite(value)) this.stopAt = Math.max(1, Math.floor(value));
+	}
+
 	get maxEpochs() {
 		return this.dataset.maxEpochs;
 	}
@@ -99,6 +113,7 @@ class Lab {
 		this.datasetId = id;
 		this.view = 'circuit';
 		this.guidePage = 0;
+		this.stopAt = this.dataset.maxEpochs;
 		this.loadTrained();
 	}
 
@@ -230,17 +245,24 @@ class Lab {
 
 	play() {
 		if (this.playing) return this.stop();
-		if (this.epoch >= this.maxEpochs) return;
+		if (this.epoch >= this.stopAt) this.stopAt = this.epoch + this.extension;
 		this.playing = true;
 		this.clearTrace();
-		const frame = () => {
+		let last = performance.now();
+		let allowance = 0;
+		const frame = (now: number) => {
 			if (!this.playing) return;
+			const rate = EPOCHS_PER_SECOND[this.speed] * this.data.train.X.length;
+			allowance = Math.min(allowance + (rate * Math.max(0, now - last)) / 1000, rate);
+			last = now;
 			const start = performance.now();
-			while (performance.now() - start < FRAME_BUDGET_MS && this.epoch < this.maxEpochs) {
-				for (let n = 0; n < 64 && this.epoch < this.maxEpochs; n++) this.advance(false);
+			while (allowance >= 1 && this.epoch < this.stopAt && performance.now() - start < FRAME_BUDGET_MS) {
+				const batch = Math.min(BATCH, Math.floor(allowance));
+				for (let n = 0; n < batch && this.epoch < this.stopAt; n++) this.advance(false);
+				allowance -= batch;
 			}
 			this.touch();
-			if (this.epoch >= this.maxEpochs) this.playing = false;
+			if (this.epoch >= this.stopAt) this.playing = false;
 			else requestAnimationFrame(frame);
 		};
 		requestAnimationFrame(frame);
