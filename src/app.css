@@ -1,0 +1,166 @@
+@import 'tailwindcss';
+
+:root {
+	--bg: #f8eddd;
+	--surface: #ffffff;
+	--raised: #fbf5ec;
+	--ink: #131e29;
+	--muted: #5b6570;
+	--line: #e4d6c2;
+	--accent: #c8102e;
+	--include: #131e29;
+	--pos: #1f4e79;
+	--neg: #c8102e;
+	--type-ia: #1f4e79;
+	--type-ib: #c8102e;
+	--type-ii: #03591d;
+	--tint-red: #fee7e8;
+	--tint-blue: #e1edf9;
+	--tint-green: #e6f0e5;
+	--focus: #c8102e;
+	--font-display: 'Acumin Pro', 'Source Sans 3', system-ui, sans-serif;
+	--font-body: 'Acumin Pro', 'Source Sans 3', system-ui, -apple-system, 'Segoe UI', sans-serif;
+	--font-data: 'Source Code Pro', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+	--cell: 22px;
+	color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme='light']) {
+		--bg: #131e29;
+		--surface: #1a2735;
+		--raised: #213141;
+		--ink: #f8eddd;
+		--muted: #a7b1bb;
+		--line: #33465a;
+		--accent: #f0566a;
+		--include: #e1edf9;
+		--pos: #8fb8e8;
+		--neg: #f0566a;
+		--type-ia: #8fb8e8;
+		--type-ib: #f0566a;
+		--type-ii: #7cc48f;
+		--tint-red: #3a2230;
+		--tint-blue: #1f3347;
+		--tint-green: #1e3528;
+		--focus: #f0566a;
+		color-scheme: dark;
+	}
+}
+
+:root[data-theme='dark'] {
+	--bg: #131e29;
+	--surface: #1a2735;
+	--raised: #213141;
+	--ink: #f8eddd;
+	--muted: #a7b1bb;
+	--line: #33465a;
+	--accent: #f0566a;
+	--include: #e1edf9;
+	--pos: #8fb8e8;
+	--neg: #f0566a;
+	--type-ia: #8fb8e8;
+	--type-ib: #f0566a;
+	--type-ii: #7cc48f;
+	--tint-red: #3a2230;
+	--tint-blue: #1f3347;
+	--tint-green: #1e3528;
+	--focus: #f0566a;
+	color-scheme: dark;
+}
+
+html,
+body {
+	background: var(--bg);
+	color: var(--ink);
+	font-family: var(--font-body);
+	font-size: 14px;
+	line-height: 1.5;
+	margin: 0;
+}
+
+h1,
+h2,
+h3 {
+	font-family: var(--font-display);
+	font-weight: 700;
+	text-wrap: balance;
+	margin: 0;
+}
+
+button,
+input,
+select {
+	font: inherit;
+	color: inherit;
+}
+
+:focus-visible {
+	outline: 2px solid var(--focus);
+	outline-offset: 2px;
+}
+
+.mono {
+	font-family: var(--font-data);
+	font-variant-numeric: tabular-nums;
+}
+
+.eyebrow {
+	font-size: 11px;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: var(--muted);
+	font-weight: 600;
+}
+
+.panel {
+	background: var(--surface);
+	border: 1px solid var(--line);
+	border-radius: 10px;
+}
+
+.btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 12px;
+	border-radius: 7px;
+	border: 1px solid var(--line);
+	background: var(--surface);
+	cursor: pointer;
+	font-weight: 500;
+	white-space: nowrap;
+}
+
+.btn:hover {
+	border-color: var(--muted);
+}
+
+.btn.primary {
+	background: var(--accent);
+	color: #ffffff;
+	border-color: var(--accent);
+}
+
+.btn:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+
+[data-region].spotlight {
+	box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 55%, transparent);
+	transition: box-shadow 0.25s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	* {
+		transition: none !important;
+		animation: none !important;
+	}
+}
+
+.katex {
+	text-transform: none;
+	letter-spacing: normal;
+	font-size: 1.12em;
+}
