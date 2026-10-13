@@ -1,27 +1,55 @@
 <script lang="ts">
 	import { lab } from '$lib/lab.svelte';
-	import { INCLUDE_FROM, STATE_MAX, clauseLiterals, isPositive } from '$lib/tm/machine';
+	import { INCLUDE_FROM, STATE_MAX, TYPE_IA, TYPE_IB, TYPE_II, isPositive } from '$lib/tm/machine';
 	import { literalTex, tex } from '$lib/tex';
+	import { BEAT } from '$lib/story';
+
+	type Track = {
+		k: number;
+		state: number;
+		before: number;
+		after: number;
+		kind: number;
+		value: number;
+	};
+
+	const NEAR = 16;
+	const glyph: Record<number, string> = { [TYPE_IA]: '▲', [TYPE_IB]: '▼', [TYPE_II]: '◆' };
+	const kindClass: Record<number, string> = { [TYPE_IA]: 'ia', [TYPE_IB]: 'ib', [TYPE_II]: 'ii' };
+	const kindName: Record<number, string> = { [TYPE_IA]: 'Type Ia', [TYPE_IB]: 'Type Ib', [TYPE_II]: 'Type II' };
+
+	let showAll = $state(false);
 
 	const features = $derived(lab.config.features);
 	const literalCount = $derived(2 * features);
+	const order = $derived(Array.from({ length: literalCount }, (_, i) => (i % 2 === 0 ? i / 2 : features + (i - 1) / 2)));
 
 	const detail = $derived.by(() => {
 		lab.version;
 		const sel = lab.selected;
 		if (!sel || sel.cls >= lab.config.classes || sel.clause >= lab.config.clauses) return null;
 		const { cls, clause } = sel;
-		const states = Array.from(lab.machine.states[cls].subarray(clause * literalCount, (clause + 1) * literalCount));
-		const included = clauseLiterals(lab.machine, cls, clause);
-		const values = included.map((k) => lab.inference.literals[k]);
+		const base = clause * literalCount;
+		const shown = lab.states[cls];
+		const current = lab.machine.states[cls];
+		const f = lab.trace?.feedback.find((fb) => fb.cls === cls) ?? null;
+		const tracks: Track[] = order.map((k) => ({
+			k,
+			state: shown[base + k],
+			before: f ? f.before[base + k] : current[base + k],
+			after: current[base + k],
+			kind: f && lab.moved ? f.kinds[base + k] : 0,
+			value: lab.inference.literals[k]
+		}));
+		const included = order.filter((k) => shown[base + k] >= INCLUDE_FROM);
 		return {
 			cls,
 			clause,
 			positive: isPositive(lab.machine, clause),
-			states,
+			tracks,
 			included,
-			values,
-			output: lab.inference.outputs[cls][clause]
+			output: lab.inference.outputs[cls][clause],
+			picked: !!f && lab.beat >= BEAT.select && f.selected[clause] === 1
 		};
 	});
 
@@ -33,15 +61,21 @@
 		return tex(`${name} = ${body}`);
 	});
 
-	const W = 520;
-	const H = 150;
-	const pad = { top: 14, right: 8, bottom: 34, left: 30 };
-	const plotW = W - pad.left - pad.right;
-	const plotH = H - pad.top - pad.bottom;
-	const y = (s: number) => pad.top + plotH - (s / STATE_MAX) * plotH;
-	const step = $derived(plotW / literalCount);
-	const x = (k: number) => pad.left + k * step;
-	let hover = $state<number | null>(null);
+	const visible = $derived(
+		detail ? detail.tracks.filter((t) => showAll || t.kind || t.state >= INCLUDE_FROM - NEAR) : []
+	);
+
+	const moves = $derived(detail ? detail.tracks.filter((t) => t.kind).length : 0);
+
+	const position = (state: number) => `${(state / STATE_MAX) * 100}%`;
+
+	function change(t: Track) {
+		if (!t.kind) return '';
+		const crossedIn = t.before < INCLUDE_FROM && t.after >= INCLUDE_FROM;
+		const crossedOut = t.before >= INCLUDE_FROM && t.after < INCLUDE_FROM;
+		const note = crossedIn ? ' · now included' : crossedOut ? ' · now excluded' : '';
+		return `${t.before} → ${t.after}${note}`;
+	}
 </script>
 
 <section class="panel detail" data-region="detail" class:spotlight={lab.region === 'detail'}>
@@ -59,68 +93,68 @@
 			{#if detail.included.length === 0}
 				No literal is included. An empty clause outputs 1 during training and 0 at inference.
 			{:else}
-				{#each detail.included as k, i}
-					<span class="term" class:zero={!detail.values[i]}>{@html tex(`${literalTex(k, features)} = ${detail.values[i]}`)}</span>
+				{#each detail.included as k}
+					<span class="term" class:zero={!lab.inference.literals[k]}>{@html tex(`${literalTex(k, features)} = ${lab.inference.literals[k]}`)}</span>
 				{/each}
 				<span class="arrow">→</span>
 				<span class="term out" class:zero={!detail.output}>{@html tex(`${name} = ${detail.output}`)}</span>
 			{/if}
 		</p>
 
-		<div class="chart">
-			<div class="stage">
-			<svg viewBox="0 0 {W} {H}" role="img" aria-label="Tsetlin automaton states for this clause">
-				{#each [0, INCLUDE_FROM, STATE_MAX] as tick}
-					<line class="grid" x1={pad.left} x2={W - pad.right} y1={y(tick)} y2={y(tick)} class:boundary={tick === INCLUDE_FROM} />
-					<text class="axis" x={pad.left - 4} y={y(tick) + 3} text-anchor="end">{tick}</text>
-				{/each}
-				{#each detail.states as s, k}
-					{@const top = Math.min(y(s), y(INCLUDE_FROM))}
-					{@const height = Math.max(1.5, Math.abs(y(s) - y(INCLUDE_FROM)))}
-					<rect
-						x={x(k) + 2}
-						y={top}
-						width={Math.max(2, step - 4)}
-						height={height}
-						rx="2"
-						class:inc={s >= INCLUDE_FROM}
-						class:exc={s < INCLUDE_FROM}
-					/>
-					<rect
-						class="hit"
-						x={x(k)}
-						y={pad.top}
-						width={step}
-						height={plotH}
-						role="presentation"
-						onpointerenter={() => (hover = k)}
-						onpointerleave={() => (hover = null)}
-					/>
-				{/each}
-				<text class="axis" x={W - pad.right} y={pad.top - 1} text-anchor="end">↑ include · exclude ↓</text>
-			</svg>
-			<div class="labels" aria-hidden="true">
-				{#each detail.states as _, k}
-					<span class="lbl" style:left={`${((x(k) + step / 2) / W) * 100}%`} style:top={`${((H - pad.bottom + 10) / H) * 100}%`}>{@html tex(literalTex(k, features))}</span>
-				{/each}
-			</div>
+		<div class="trackhead">
+			<p class="eyebrow">Tsetlin automata</p>
+			<div class="filter" role="group" aria-label="Which automata to show">
+				<button class:on={!showAll} onclick={() => (showAll = false)}>Near or above the boundary</button>
+				<button class:on={showAll} onclick={() => (showAll = true)}>All {literalCount}</button>
 			</div>
 		</div>
-		<p class="readout">
-			{#if hover !== null}
-				{@const s = detail.states[hover]}
-				{@html tex(literalTex(hover, features))}: state {s},
-				{s >= INCLUDE_FROM ? `include, ${s - INCLUDE_FROM + 1} steps past the boundary` : `exclude, ${INCLUDE_FROM - s} steps below the boundary`}
+
+		<div class="scale" aria-hidden="true">
+			<span></span>
+			<span class="ruler mono">
+				<span style:left="0">0</span>
+				<span class="mark" style:left={position(INCLUDE_FROM)}>{INCLUDE_FROM}</span>
+				<span class="end">{STATE_MAX}</span>
+			</span>
+		</div>
+		<ul class="tracks">
+			{#each visible as t (t.k)}
+				{@const included = t.state >= INCLUDE_FROM}
+				<li class:active={t.kind !== 0}>
+					<span class="lit">{@html tex(literalTex(t.k, features))}</span>
+					<span class="val mono" class:one={t.value}>{t.value}</span>
+					<span class="track" title="state {t.state} of {STATE_MAX}">
+						<span class="line"></span>
+						<span class="boundary" style:left={position(INCLUDE_FROM - 0.5)}></span>
+						{#if t.kind}
+							<span class="ghost" style:left={position(t.before)}></span>
+						{/if}
+						<span class="bead" class:included style:left={position(t.state)}></span>
+						{#if t.kind}
+							<span class="kind {kindClass[t.kind]}" style:left={position(t.state)}>{glyph[t.kind]}</span>
+						{/if}
+					</span>
+					{#if t.kind}
+						<span class="note mono" class:cross={change(t).includes('now')}>
+							<span class={kindClass[t.kind]}>{kindName[t.kind]}</span> {change(t)}
+						</span>
+					{/if}
+				</li>
+			{/each}
+		</ul>
+		<p class="caption">
+			{#if lab.trace && lab.moved}
+				{moves
+					? `${moves} automata moved one state each. A move only changes the rule when an automaton crosses the boundary.`
+					: 'No automaton in this clause moved on this step.'}
+			{:else if lab.trace}
+				{detail.picked ? 'This clause was picked for feedback. Watch its automata move in the next beat.' : 'States before the update.'}
 			{:else}
-				Hover over a bar to read its automaton state.
+				Each literal has its own automaton with {STATE_MAX + 1} states. States {INCLUDE_FROM} to {STATE_MAX} mean include.
 			{/if}
 		</p>
-		<p class="caption">
-			Each literal has its own Tsetlin automaton with {STATE_MAX + 1} states. States {INCLUDE_FROM}–{STATE_MAX} mean include.
-			Bars grow away from the decision boundary, so a long bar is a confident automaton.
-		</p>
 	{:else}
-		<p class="empty">Click any clause row to see its rule and its automaton states.</p>
+		<p class="empty">Click a gate in the circuit to see its rule and its automata.</p>
 	{/if}
 </section>
 
@@ -134,7 +168,6 @@
 	}
 	h2 {
 		font-size: 16px;
-		font-weight: 700;
 	}
 	h2 span {
 		font-family: var(--font-body);
@@ -182,59 +215,175 @@
 	.arrow {
 		color: var(--muted);
 	}
-	.chart {
-		overflow-x: auto;
+	.trackhead {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 8px;
+		flex-wrap: wrap;
+		margin-top: 4px;
 	}
-	.stage {
-		position: relative;
-		min-width: 420px;
-		container-type: inline-size;
+	.filter {
+		display: inline-flex;
+		border: 1px solid var(--line);
+		border-radius: 7px;
+		overflow: hidden;
 	}
-	svg {
-		width: 100%;
-		height: auto;
-		display: block;
-	}
-	.labels {
-		position: absolute;
-		inset: 0;
-		pointer-events: none;
+	.filter button {
+		border: 0;
+		background: var(--surface);
+		padding: 3px 9px;
+		font-size: 11px;
+		cursor: pointer;
 		color: var(--muted);
-		font-size: calc(10 * 100cqw / 520);
 	}
-	.lbl {
+	.filter button.on {
+		background: var(--ink);
+		color: var(--surface);
+	}
+	.scale {
+		display: grid;
+		grid-template-columns: 74px 1fr;
+		gap: 8px;
+		padding: 0 4px;
+	}
+	.ruler {
+		position: relative;
+		height: 14px;
+		font-size: 10px;
+		color: var(--muted);
+	}
+	.ruler span {
 		position: absolute;
-		transform: translate(-50%, 0) rotate(-60deg);
-		transform-origin: 50% 50%;
-		white-space: nowrap;
-		line-height: 1;
+		top: 0;
 	}
-	.readout {
+	.ruler .mark {
+		transform: translateX(-50%);
+	}
+	.ruler .end {
+		right: 0;
+	}
+	.tracks {
+		list-style: none;
 		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+	li {
+		display: grid;
+		grid-template-columns: 44px 22px minmax(80px, 1fr);
+		column-gap: 8px;
+		align-items: center;
+		min-height: 22px;
+		padding: 0 4px;
+		border-radius: 5px;
+	}
+	li.active {
+		background: var(--raised);
+	}
+	.lit {
 		font-size: 12px;
-		min-height: 18px;
+		text-align: right;
 	}
-	.grid {
-		stroke: var(--line);
-		stroke-width: 1;
+	.val {
+		width: 20px;
+		height: 16px;
+		border-radius: 4px;
+		border: 1px solid var(--line);
+		display: grid;
+		place-items: center;
+		font-size: 10px;
+		color: var(--muted);
 	}
-	.grid.boundary {
-		stroke: var(--muted);
-		stroke-dasharray: 3 3;
+	.val.one {
+		background: var(--ink);
+		border-color: var(--ink);
+		color: var(--surface);
 	}
-	.axis {
-		fill: var(--muted);
-		font-family: var(--font-data);
-		font-size: 9px;
+	.track {
+		position: relative;
+		height: 18px;
 	}
-	rect.inc {
-		fill: var(--include);
+	.line {
+		position: absolute;
+		left: 0;
+		right: 0;
+		top: 50%;
+		height: 2px;
+		margin-top: -1px;
+		background: var(--line);
+		border-radius: 1px;
 	}
-	rect.exc {
-		fill: color-mix(in oklab, var(--muted) 45%, var(--surface));
+	.boundary {
+		position: absolute;
+		top: 1px;
+		bottom: 1px;
+		width: 0;
+		border-left: 1.5px dashed var(--muted);
 	}
-	rect.hit {
-		fill: transparent;
+	.bead,
+	.ghost {
+		position: absolute;
+		top: 50%;
+		width: 11px;
+		height: 11px;
+		margin: -5.5px 0 0 -5.5px;
+		border-radius: 50%;
+		transition: left 0.7s cubic-bezier(0.3, 1.4, 0.5, 1);
+	}
+	.bead {
+		background: var(--surface);
+		border: 2px solid var(--muted);
+	}
+	.bead.included {
+		background: var(--ink);
+		border-color: var(--ink);
+	}
+	.ghost {
+		border: 1.5px dashed var(--muted);
+		opacity: 0.6;
+		transition: none;
+	}
+	.kind {
+		position: absolute;
+		top: -3px;
+		margin-left: 7px;
+		font-size: 10px;
+		font-weight: 700;
+		line-height: 1;
+		transition: left 0.7s;
+		animation: pop 0.5s ease-out;
+	}
+	@keyframes pop {
+		from {
+			transform: scale(2.4);
+			opacity: 0;
+		}
+		to {
+			transform: scale(1);
+			opacity: 1;
+		}
+	}
+	.ia {
+		color: var(--type-ia);
+	}
+	.ib {
+		color: var(--type-ib);
+	}
+	.ii {
+		color: var(--type-ii);
+	}
+	.note {
+		grid-column: 3;
+		font-size: 11px;
+		color: var(--muted);
+		padding-bottom: 3px;
+	}
+	.note.cross {
+		color: var(--accent);
+		font-weight: 500;
 	}
 	.caption,
 	.empty {

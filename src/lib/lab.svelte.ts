@@ -12,6 +12,7 @@ import { noisyXor, xorLabel } from './tm/noisyxor';
 import { createRng, shuffle } from './tm/rng';
 import { DATA_SEED, DEFAULT_CONFIG, MAX_EPOCHS } from './tm/defaults';
 import pretrained from './tm/pretrained.json';
+import { BEAT, BEATS, BEAT_MS } from './story';
 
 export type Point = { epoch: number; accuracy: number };
 export type Source = 'manual' | 'train' | 'test';
@@ -37,13 +38,40 @@ class Lab {
 	playing = $state(false);
 	guideOpen = $state(true);
 	guidePage = $state(0);
-	region = $state<string | null>(null);
+	guideRegion = $state<string | null>(null);
 	view = $state<'circuit' | 'matrix'>('circuit');
+	beat = $state(0);
+	storyPlaying = $state(false);
+	storyTimer: ReturnType<typeof setTimeout> | null = null;
+
+	moved = $derived(!!this.trace && this.beat >= BEAT.move);
+
+	states = $derived.by(() => {
+		this.version;
+		const trace = this.trace;
+		if (!trace || this.moved) return this.machine.states;
+		return this.machine.states.map((s, c) => trace.feedback.find((f) => f.cls === c)?.before ?? s);
+	});
 
 	inference = $derived.by(() => {
 		this.version;
-		return infer(this.machine, this.input);
+		return infer({ ...this.machine, states: this.states }, this.input);
 	});
+
+	before = $derived.by(() => {
+		this.version;
+		const trace = this.trace;
+		if (!trace) return null;
+		const states = this.machine.states.map((s, c) => trace.feedback.find((f) => f.cls === c)?.before ?? s);
+		return infer({ ...this.machine, states }, trace.x);
+	});
+
+	after = $derived.by(() => {
+		this.version;
+		return this.trace ? infer(this.machine, this.trace.x) : null;
+	});
+
+	region = $derived(this.trace ? BEATS[this.beat].region : this.guideRegion);
 
 	trueLabel = $derived(xorLabel(this.input));
 
@@ -68,7 +96,7 @@ class Lab {
 		this.steps = this.epoch * this.data.train.X.length;
 		this.reseed(this.epoch);
 		this.startEpoch();
-		this.trace = null;
+		this.clearTrace();
 		this.selected = { cls: 1, clause: 0 };
 		this.showTest(this.firstTestIndex(1));
 		this.touch();
@@ -82,7 +110,7 @@ class Lab {
 		this.steps = 0;
 		this.history = [{ epoch: 0, accuracy: this.testAccuracy() }];
 		this.startEpoch();
-		this.trace = null;
+		this.clearTrace();
 		this.selected = null;
 		this.touch();
 	}
@@ -130,12 +158,59 @@ class Lab {
 		this.label = this.data.train.Y[i];
 		this.source = 'train';
 		this.trace = this.advance(true);
+		this.selected = this.busiestClause(this.trace!);
+		this.beat = 0;
 		this.touch();
+		this.playStory();
+	}
+
+	busiestClause(trace: StepTrace) {
+		const L = this.machine.literals;
+		let best = { cls: trace.y, clause: 0, moves: -1 };
+		for (const f of trace.feedback) {
+			for (let j = 0; j < this.config.clauses; j++) {
+				let moves = 0;
+				for (let k = 0; k < L; k++) if (f.kinds[j * L + k]) moves++;
+				const preferred = f.role === 'target' ? 0.5 : 0;
+				if (moves + preferred > best.moves) best = { cls: f.cls, clause: j, moves: moves + preferred };
+			}
+		}
+		return { cls: best.cls, clause: best.clause };
+	}
+
+	playStory() {
+		this.pauseStory();
+		if (!this.trace || this.beat >= BEATS.length - 1) return;
+		this.storyPlaying = true;
+		const tick = () => {
+			if (!this.storyPlaying || !this.trace) return;
+			this.beat++;
+			if (this.beat < BEATS.length - 1) this.storyTimer = setTimeout(tick, BEAT_MS);
+			else this.storyPlaying = false;
+		};
+		this.storyTimer = setTimeout(tick, BEAT_MS);
+	}
+
+	pauseStory() {
+		this.storyPlaying = false;
+		if (this.storyTimer) clearTimeout(this.storyTimer);
+		this.storyTimer = null;
+	}
+
+	goToBeat(beat: number) {
+		this.pauseStory();
+		this.beat = Math.max(0, Math.min(BEATS.length - 1, beat));
+	}
+
+	clearTrace() {
+		this.pauseStory();
+		this.trace = null;
+		this.beat = 0;
 	}
 
 	runEpoch() {
 		this.stop();
-		this.trace = null;
+		this.clearTrace();
 		const target = this.epoch + 1;
 		while (this.epoch < target) this.advance(false);
 		this.touch();
@@ -145,7 +220,7 @@ class Lab {
 		if (this.playing) return this.stop();
 		if (this.epoch >= MAX_EPOCHS) return;
 		this.playing = true;
-		this.trace = null;
+		this.clearTrace();
 		const frame = () => {
 			if (!this.playing) return;
 			for (let n = 0; n < STEPS_PER_FRAME && this.epoch < MAX_EPOCHS; n++) this.advance(false);
@@ -164,7 +239,7 @@ class Lab {
 		this.input = Array.from(this.data.test.X[i]);
 		this.label = this.data.test.Y[i];
 		this.source = 'test';
-		this.trace = null;
+		this.clearTrace();
 	}
 
 	randomTest() {
@@ -177,7 +252,7 @@ class Lab {
 		this.input = next;
 		this.label = null;
 		this.source = 'manual';
-		this.trace = null;
+		this.clearTrace();
 	}
 
 	select(cls: number, clause: number) {

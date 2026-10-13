@@ -13,13 +13,12 @@
 	import { gsap } from 'gsap';
 	import ViewSwitch from './ViewSwitch.svelte';
 	import { literalTex, rich, tex } from '$lib/tex';
+	import { BEAT } from '$lib/story';
 
-	let view = $state<'before' | 'after'>('before');
 	let root: HTMLElement;
 
 	$effect(() => {
-		if (!lab.trace || !root) return;
-		view = 'before';
+		if (!lab.moved || !root) return;
 		if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 		const marks = root.querySelectorAll('.cell .kind');
 		gsap.fromTo(marks, { scale: 2.2, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.4, stagger: 0.003, ease: 'back.out(2)' });
@@ -32,12 +31,10 @@
 	const classIndices = $derived(Array.from({ length: lab.config.classes }, (_, c) => c));
 
 	const feedbackFor = (cls: number) => lab.trace?.feedback.find((f) => f.cls === cls) ?? null;
+	const shown = (beat: number) => !!lab.trace && lab.beat >= beat;
 
 	function stateOf(cls: number, clause: number, k: number) {
-		lab.version;
-		const f = feedbackFor(cls);
-		const states = f && view === 'before' ? f.before : lab.machine.states[cls];
-		return states[clause * literalCount + k];
+		return lab.states[cls][clause * literalCount + k];
 	}
 
 	function outputOf(cls: number, clause: number) {
@@ -75,15 +72,7 @@
 			<p class="eyebrow">Clauses</p>
 			<h2>Tsetlin automata decide which literals each clause uses</h2>
 		</div>
-		<div class="headtools">
 		<ViewSwitch />
-		{#if lab.trace}
-			<div class="view" role="group" aria-label="Which TA states to show">
-				<button class:on={view === 'before'} onclick={() => (view = 'before')}>Before update</button>
-				<button class:on={view === 'after'} onclick={() => (view = 'after')}>After update</button>
-			</div>
-		{/if}
-		</div>
 	</header>
 
 	<div class="scroll">
@@ -104,7 +93,7 @@
 				<div class="classrow">
 					<span class="eyebrow">Class {c}</span>
 					<span class="classname">{@html rich(CLASS_NAMES[c])}</span>
-					{#if feedbackFor(c)}
+					{#if feedbackFor(c) && shown(BEAT.probability)}
 						{@const f = feedbackFor(c)!}
 						<span class="role mono" class:target={f.role === 'target'}>
 							{f.role === 'target' ? 'target class' : 'sampled negative class'} · {@html tex(`p = ${f.probability.toFixed(2)}`)}
@@ -114,7 +103,7 @@
 				{#each clauseIndices as j}
 					{@const positive = isPositive(lab.machine, j)}
 					{@const f = feedbackFor(c)}
-					{@const picked = !f || f.selected[j] === 1}
+					{@const picked = !f || !shown(BEAT.select) || f.selected[j] === 1}
 					{@const out = outputOf(c, j)}
 					{@const isSelected = lab.selected?.cls === c && lab.selected?.clause === j}
 					<button
@@ -131,7 +120,7 @@
 					<div class="cells" class:dim={!picked} class:chosen={isSelected}>
 						{#each literalIndices as k}
 							{@const state = stateOf(c, j, k)}
-							{@const kind = f ? f.kinds[j * literalCount + k] : 0}
+							{@const kind = f && lab.moved ? f.kinds[j * literalCount + k] : 0}
 							{@const blocking = state >= INCLUDE_FROM && !literalValue(k)}
 							<button
 								class="cell"
@@ -153,7 +142,7 @@
 						<span class="dot" class:on={out === 1} aria-label="clause output {out}"></span>
 					</div>
 					<div class="vote mono" class:dim={!picked}>
-						{#if f}
+						{#if f && shown(BEAT.select)}
 							{@const typeOne = positive === (f.role === 'target')}
 							<span
 								class="fb"
@@ -206,28 +195,6 @@
 	h2 {
 		font-size: 18px;
 		font-weight: 700;
-	}
-	.headtools {
-		display: flex;
-		gap: 8px;
-		flex-wrap: wrap;
-	}
-	.view {
-		display: inline-flex;
-		border: 1px solid var(--line);
-		border-radius: 7px;
-		overflow: hidden;
-	}
-	.view button {
-		border: 0;
-		background: var(--surface);
-		padding: 4px 10px;
-		cursor: pointer;
-		font-size: 12px;
-	}
-	.view button.on {
-		background: var(--ink);
-		color: var(--surface);
 	}
 	.scroll {
 		overflow-x: auto;

@@ -1,34 +1,10 @@
 <script lang="ts">
 	import { lab } from '$lib/lab.svelte';
-	import { rich, tex } from '$lib/tex';
+	import { rich } from '$lib/tex';
 	import { MAX_EPOCHS } from '$lib/tm/defaults';
-	import { TYPE_IA, TYPE_IB, TYPE_II, isPositive, type ClassFeedback } from '$lib/tm/machine';
+	import StepStory from './StepStory.svelte';
 
 	const clauseOptions = [2, 4, 6, 8, 10, 12, 16, 20];
-
-	function probabilityTex(f: ClassFeedback) {
-		const T = lab.config.T;
-		const v = f.sum;
-		const formula =
-			f.role === 'target'
-				? `p = \\frac{T - v}{2T} = \\frac{${T} - (${v})}{${2 * T}} = ${f.probability.toFixed(2)}`
-				: `p = \\frac{T + v}{2T} = \\frac{${T} + (${v})}{${2 * T}} = ${f.probability.toFixed(2)}`;
-		return tex(formula);
-	}
-
-	function count(f: ClassFeedback, kind: number) {
-		let n = 0;
-		for (const k of f.kinds) if (k === kind) n++;
-		return n;
-	}
-
-	function picked(f: ClassFeedback, positive: boolean) {
-		let n = 0;
-		f.selected.forEach((s, j) => {
-			if (s && isPositive(lab.machine, j) === positive) n++;
-		});
-		return n;
-	}
 
 	function setClauses(event: Event) {
 		const clauses = Number((event.target as HTMLSelectElement).value);
@@ -100,28 +76,9 @@
 	</div>
 
 	{#if lab.trace}
-		<div class="feedback">
-			{#each lab.trace.feedback as f}
-				<article class:target={f.role === 'target'}>
-					<p class="eyebrow">{f.role === 'target' ? 'Target class' : 'Sampled negative class'} · class {f.cls} · {@html tex(`v_{${f.cls}} = ${f.sum}`)}</p>
-					<div class="tex">{@html probabilityTex(f)}</div>
-					<p class="explain">
-						{#if f.role === 'target'}
-							The class should vote higher. Positive clauses get Type I feedback ({picked(f, true)} picked). Negative clauses get Type II ({picked(f, false)} picked), which only acts on clauses that output 1.
-						{:else}
-							The class should vote lower. Negative clauses get Type I feedback ({picked(f, false)} picked). Positive clauses get Type II ({picked(f, true)} picked), which only acts on clauses that output 1.
-						{/if}
-					</p>
-					<p class="counts mono">
-						<span class="ia">▲ Ia {count(f, TYPE_IA)}</span>
-						<span class="ib">▼ Ib {count(f, TYPE_IB)}</span>
-						<span class="ii">◆ II {count(f, TYPE_II)}</span>
-					</p>
-				</article>
-			{/each}
-		</div>
+		<StepStory />
 	{:else}
-		<p class="hintline">Press <b>Step one example</b> to see which clauses receive feedback and how each automaton moves.</p>
+		<p class="hintline">Press <b>Step one example</b> to follow one training step, beat by beat.</p>
 	{/if}
 </section>
 
@@ -198,46 +155,6 @@
 	.hint {
 		font-size: 11px;
 		color: var(--muted);
-	}
-	.feedback {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-		gap: 12px;
-	}
-	article {
-		border: 1px solid var(--line);
-		border-radius: 8px;
-		padding: 12px;
-		display: flex;
-		flex-direction: column;
-		gap: 6px;
-		background: var(--raised);
-	}
-	article.target {
-		border-color: var(--ink);
-	}
-	.tex {
-		font-size: 15px;
-		overflow-x: auto;
-	}
-	.explain {
-		margin: 0;
-		font-size: 13px;
-	}
-	.counts {
-		margin: 0;
-		display: flex;
-		gap: 14px;
-		font-size: 12px;
-	}
-	.ia {
-		color: var(--type-ia);
-	}
-	.ib {
-		color: var(--type-ib);
-	}
-	.ii {
-		color: var(--type-ii);
 	}
 	.hintline {
 		margin: 0;

@@ -4,6 +4,7 @@
 	import { lab } from '$lib/lab.svelte';
 	import { INCLUDE_FROM, STATE_MAX, isPositive } from '$lib/tm/machine';
 	import { SHORT_CLASS_TEX } from '$lib/labels';
+	import { BEAT } from '$lib/story';
 	import { literalTex, rich, tex } from '$lib/tex';
 	import ViewSwitch from './ViewSwitch.svelte';
 
@@ -56,13 +57,14 @@
 	}
 
 	const feedbackFor = (c: number) => lab.trace?.feedback.find((f) => f.cls === c) ?? null;
+	const shown = (beat: number) => !!lab.trace && lab.beat >= beat;
 
 	const wires = $derived.by(() => {
 		lab.version;
 		const list: Wire[] = [];
 		for (let c = 0; c < C; c++) {
-			const states = lab.machine.states[c];
-			const f = feedbackFor(c);
+			const states = lab.states[c];
+			const f = lab.moved ? feedbackFor(c) : null;
 			for (let j = 0; j < n; j++) {
 				const included: number[] = [];
 				for (let k = 0; k < L; k++) if (states[j * L + k] >= INCLUDE_FROM) included.push(k);
@@ -91,6 +93,7 @@
 	const dying = $derived.by(() => {
 		lab.version;
 		const list: { key: string; d: string }[] = [];
+		if (!lab.moved) return list;
 		for (const f of lab.trace?.feedback ?? []) {
 			const states = lab.machine.states[f.cls];
 			for (let j = 0; j < n; j++) {
@@ -111,7 +114,7 @@
 		lab.version;
 		if (!hover) return [];
 		const { c, j } = hover;
-		const states = lab.machine.states[c];
+		const states = lab.states[c];
 		const list: { key: string; d: string }[] = [];
 		for (let k = 0; k < L; k++) {
 			const s = states[j * L + k];
@@ -134,7 +137,7 @@
 
 	function rule(c: number, j: number) {
 		lab.version;
-		const states = lab.machine.states[c];
+		const states = lab.states[c];
 		const terms: string[] = [];
 		for (let k = 0; k < L; k++) if (states[j * L + k] >= INCLUDE_FROM) terms.push(literalTex(k, F));
 		return `${gateTex(j)} = ${terms.length ? terms.join(' \\land ') : '\\text{empty}'}`;
@@ -197,7 +200,7 @@
 	});
 
 	$effect(() => {
-		if (!lab.trace) return;
+		if (!lab.moved) return;
 		tick().then(flashFeedback);
 	});
 </script>
@@ -317,7 +320,7 @@
 					>
 						<path class="body" d={gatePath(c, j)} />
 					</g>
-					{#if f?.selected[j]}
+					{#if shown(BEAT.select) && f?.selected[j]}
 						<g class="tag" class:idle={!typeOne && !f.outputs[j]}>
 							<rect x={GATE_X + GATE_W + 6} y={y - 8} width={typeOne ? 14 : 18} height="16" rx="3" />
 							<text x={GATE_X + GATE_W + 6 + (typeOne ? 7 : 9)} y={y + 4} text-anchor="middle">{typeOne ? 'I' : 'II'}</text>
@@ -357,7 +360,7 @@
 				{@const f = feedbackFor(c)}
 				<span class="lbl left above classname" style:left={px(GATE_X)} style:top={py(classTop(c) - 6)}>
 					{@html rich(`Class ${c} · $${SHORT_CLASS_TEX[c]}$`)}
-					{#if f}<span class="role" class:target={f.role === 'target'}>{f.role === 'target' ? 'target' : 'negative'} · {@html tex(`p = ${f.probability.toFixed(2)}`)}</span>{/if}
+					{#if f && shown(BEAT.probability)}<span class="role" class:target={f.role === 'target'}>{f.role === 'target' ? 'target' : 'negative'} · {@html tex(`p = ${f.probability.toFixed(2)}`)}</span>{/if}
 				</span>
 				{#each Array.from({ length: n }, (_, j) => j) as j}
 					{@const positive = isPositive(lab.machine, j)}

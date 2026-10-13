@@ -45,6 +45,15 @@ export const GUIDE: GuidePage[] = [
 		formula: 'C_j = \\bigwedge_{k \\in I_j} l_k'
 	},
 	{
+		title: 'What a clause covers',
+		region: 'coverage',
+		body: [
+			'A clause fires on a region of the input space. The coverage map shows that region for two chosen bits.',
+			'The first map shows how often the selected clause outputs 1 in each cell. The class maps show the mean class sum. Together they draw the XOR pattern.',
+			'Choose a noise bit as an axis. The map goes flat, because the trained clauses ignore it.'
+		]
+	},
+	{
 		title: 'Polarity and voting',
 		region: 'votes',
 		body: [
@@ -59,7 +68,7 @@ export const GUIDE: GuidePage[] = [
 		body: [
 			'Each training example updates two classes. The target class should vote higher. One other class, chosen at random, should vote lower.',
 			'Each clause receives feedback with probability $p$. Feedback fades as $v$ approaches $T$. This stops many clauses from piling onto the same pattern.',
-			'Press Step one example and read the two cards. They show $v$, $p$ and how many clauses were picked.'
+			'Press Step one example. The step plays in six beats: the example, the class sums, the feedback dial for $p$, the picked clauses, the automata moves and the result. Pause at any beat.'
 		],
 		formula: 'p_{\\text{target}} = \\frac{T - v}{2T}, \\qquad p_{\\text{negative}} = \\frac{T + v}{2T}'
 	},
@@ -69,7 +78,8 @@ export const GUIDE: GuidePage[] = [
 		body: [
 			'Type I feedback makes a clause fire for the right patterns. It goes to positive clauses of the target class and negative clauses of the other class.',
 			'Type Ia: if the clause outputs 1, literals that are 1 step towards include with probability $(s - 1)/s$.',
-			'Type Ib: every other literal steps towards exclude with probability $1/s$. A large $s$ gives specific clauses with many literals. A small $s$ gives general clauses.'
+			'Type Ib: every other literal steps towards exclude with probability $1/s$. A large $s$ gives specific clauses with many literals. A small $s$ gives general clauses.',
+			'In the inspector, each automaton is a bead on a track from 0 to 255. Each move shifts a bead by one state. The rule only changes when a bead crosses the dashed boundary.'
 		],
 		formula: '\\text{Ia: } \\Pr[\\uparrow] = \\tfrac{s-1}{s}, \\qquad \\text{Ib: } \\Pr[\\downarrow] = \\tfrac{1}{s}'
 	},

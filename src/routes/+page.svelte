@@ -5,6 +5,7 @@
 	import Circuit from '$lib/components/Circuit.svelte';
 	import Votes from '$lib/components/Votes.svelte';
 	import ClauseDetail from '$lib/components/ClauseDetail.svelte';
+	import CoverageMap from '$lib/components/CoverageMap.svelte';
 	import TrainingPanel from '$lib/components/TrainingPanel.svelte';
 	import AccuracyChart from '$lib/components/AccuracyChart.svelte';
 	import Guide from '$lib/components/Guide.svelte';
@@ -54,7 +55,10 @@
 			</div>
 			<div class="bench">
 				<TrainingPanel />
-				<AccuracyChart />
+				<div class="side">
+					<AccuracyChart />
+					<CoverageMap />
+				</div>
 			</div>
 		</main>
 		{#if lab.guideOpen}
