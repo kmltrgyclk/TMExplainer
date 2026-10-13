@@ -9,15 +9,7 @@
 	import TrainingPanel from '$lib/components/TrainingPanel.svelte';
 	import AccuracyChart from '$lib/components/AccuracyChart.svelte';
 	import Guide from '$lib/components/Guide.svelte';
-
-	type Theme = 'system' | 'light' | 'dark';
-	let theme = $state<Theme>('system');
-
-	function cycleTheme() {
-		theme = theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system';
-		if (theme === 'system') document.documentElement.removeAttribute('data-theme');
-		else document.documentElement.setAttribute('data-theme', theme);
-	}
+	import ThemeSwitch from '$lib/components/ThemeSwitch.svelte';
 </script>
 
 <svelte:head>
@@ -32,7 +24,7 @@
 			<p>An interactive Tsetlin Machine. Watch propositional clauses learn noisy XOR in your browser. Every number on this page comes from a live machine.</p>
 		</div>
 		<div class="actions">
-			<button class="btn" onclick={cycleTheme} aria-label="Change colour theme">Theme: {theme}</button>
+			<ThemeSwitch />
 			{#if !lab.guideOpen}
 				<button class="btn primary" onclick={() => (lab.guideOpen = true)}>Open guide</button>
 			{/if}
@@ -102,6 +94,7 @@
 	}
 	.actions {
 		display: flex;
+		align-items: center;
 		gap: 8px;
 	}
 	.layout {
